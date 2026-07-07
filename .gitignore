@@ -1,0 +1,23 @@
+# Vector store (generated, too large)
+data/vectorstore/
+
+# Environment
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+PRESENTATION.md
+TEACHING_NOTES.md
