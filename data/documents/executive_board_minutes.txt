@@ -1,0 +1,21 @@
+NexaFin Technologies - Board Meeting Minutes (March 15, 2026)
+CONFIDENTIAL - Executive Access Only
+
+Attendees: Alex Thompson (CEO), Sarah Chen (CFO), Board Members: David Kim (Sequoia), Rachel Torres (a16z), Mark Williams (Independent)
+
+Financial Update (Sarah Chen):
+Q1 revenue at $4.2M, exceeding forecast by 8%. Cash position strong at $8.7M. Burn rate decreased to $2.1M/month from $2.4M. Board approved the Q2 budget with expanded engineering headcount.
+
+Series B Discussion:
+The board discussed timing for Series B fundraise. Target: $25M at $150M pre-money valuation. David Kim recommends waiting until Q3 when ARR hits $20M for stronger negotiating position. Rachel Torres agreed but suggested starting warm conversations with Tiger Global and Coatue now. Decision: Begin soft outreach in May, formal process starts August 2026.
+
+Acquisition Opportunity:
+Alex presented analysis of acquiring PayStream, a smaller competitor with 200 customers and $2M ARR. Asking price: $12M. Board concerns about integration complexity and cultural fit. Decision: Proceed to due diligence phase. Sarah to lead financial analysis, Raj Patel to assess technical integration.
+
+Key Decisions:
+1. Series B preparation begins May 2026
+2. PayStream acquisition due diligence approved
+3. Engineering hiring plan for Q2 approved (3 engineers)
+4. Marketing budget increase to $450K for NexaPay 2.0 launch approved
+
+Next board meeting: June 20, 2026

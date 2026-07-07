@@ -1,0 +1,17 @@
+NexaFin Technologies - Marketing Strategy 2026
+
+Mission: Position NexaFin as the go-to payment infrastructure for mid-market SaaS companies in North America and Europe.
+
+Target Audience: SaaS companies with $1M-$50M ARR that need embedded payment processing. Decision makers: CTOs, VP Engineering, Head of Product.
+
+Q1-Q2 Focus: Product launch campaign for NexaPay 2.0 (our embedded payments API). Total budget: $450K. Goal: 500 qualified leads and 50 demo requests.
+
+Channel Strategy:
+- Content marketing (40% of budget): Weekly blog posts on fintech engineering, monthly technical whitepapers, SEO targeting "embedded payments API" and "SaaS payment infrastructure"
+- LinkedIn advertising (25%): Sponsored posts targeting SaaS CTOs, retargeting website visitors, ABM campaigns for top 200 target accounts
+- Developer conferences (20%): Sponsor SaaStr 2026, FinTech DevCon, and API World. Speaking slots at 3+ events.
+- Partnerships (15%): Co-marketing with Stripe alternatives, integration partners (Plaid, Dwolla), and SaaS review platforms (G2, Capterra)
+
+KPIs: Website traffic: 50K monthly visitors by Q4. Lead gen: 200 MQLs/month. Conversion rate: Demo to customer at 15%. Customer acquisition cost (CAC): Below $8,000.
+
+Brand Guidelines: Use "simple, reliable, developer-first" messaging. Avoid jargon. Lead with customer success stories, not feature lists. All external content approved by Marketing Lead before publication.

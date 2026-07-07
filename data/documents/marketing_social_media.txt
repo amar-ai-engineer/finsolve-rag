@@ -1,0 +1,17 @@
+NexaFin Technologies - Social Media Guidelines
+
+Platforms: Active presence on LinkedIn (primary), Twitter/X (secondary), and GitHub (developer community). Instagram and TikTok are not priorities for B2B fintech.
+
+Posting Frequency: LinkedIn: 4 posts/week (2 company, 2 thought leadership). Twitter: daily (mix of industry commentary, product updates, and developer tips). GitHub: monthly open-source contributions and documentation updates.
+
+Content Pillars:
+1. Technical thought leadership (API design, payment security, compliance)
+2. Customer success stories (anonymized unless client approves)
+3. Engineering culture (team highlights, hackathon results, open source work)
+4. Industry trends (embedded finance, BaaS, regulatory changes)
+
+Approval Process: Routine posts (content calendar items) - Marketing team posts directly. Sensitive topics (pricing changes, partnerships, financial results) - require CMO approval. Crisis communications - only CEO or CMO may post.
+
+Employee Social Media: Employees are encouraged to share company content. Always disclose your NexaFin affiliation. Never share unreleased product info, financial data, or customer details. When in doubt, check with Marketing before posting.
+
+Response Protocol: All comments and DMs monitored during business hours. Customer complaints: acknowledge within 2 hours, escalate to support. Trolls and spam: do not engage, report and block. Media inquiries: forward to press@nexafin.com immediately.

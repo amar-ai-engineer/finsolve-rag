@@ -1,0 +1,15 @@
+NexaFin Technologies - Investment and Treasury Policy
+
+Cash Reserves: The company maintains a minimum of $3M in liquid reserves at all times. Excess cash above the $3M threshold may be invested in low-risk instruments approved by the CFO and board.
+
+Approved Investment Vehicles:
+- US Treasury Bills (T-Bills) - up to 60% of investable funds
+- Money market funds (AAA-rated only) - up to 40%
+- Corporate bonds (investment grade, A-rated minimum) - up to 20%
+- No cryptocurrency, derivatives, or equity investments permitted
+
+Foreign Exchange: All international transactions must be hedged if exceeding $50K. Approved hedging instruments include forward contracts and options through Goldman Sachs or JP Morgan. The CFO must approve any FX exposure above $100K.
+
+Vendor Payments: Net-30 terms standard. Net-60 requires VP Finance approval. Prepayments exceeding $25K require CFO signature. All vendor contracts above $100K must go through legal review.
+
+Expense Reimbursement: Maximum $500/month per employee without manager approval. Travel expenses require pre-approval for amounts exceeding $2,000. Company credit card limits: $5K for managers, $15K for directors, $50K for VPs.

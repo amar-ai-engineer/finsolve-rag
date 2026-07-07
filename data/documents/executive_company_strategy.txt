@@ -1,0 +1,34 @@
+NexaFin Technologies - 3-Year Strategic Plan (2026-2028)
+CONFIDENTIAL - Executive Access Only
+
+Vision: Become the leading embedded payments platform for mid-market SaaS companies, processing $10B+ annually by 2028.
+
+Year 1 (2026) - Foundation:
+- Launch NexaPay 2.0 with multi-currency support (Q2)
+- Reach $20M ARR by December 2026
+- Expand to 500 active customers (currently 180)
+- Close Series B at $25M+ valuation $150M+
+- Hire to 85 employees (currently 52)
+- Obtain European payment license (EMI)
+
+Year 2 (2027) - Scale:
+- Launch in UK and EU markets
+- Reach $50M ARR
+- Build partnership ecosystem (20+ integration partners)
+- Explore acquisition of 1-2 complementary companies
+- Reach 1,500 active customers
+- Consider international office (London or Amsterdam)
+
+Year 3 (2028) - Dominance:
+- Process $10B+ in transactions annually
+- Reach $100M ARR
+- IPO preparation or Series C at $500M+ valuation
+- Expand to LATAM and APAC markets
+- 5,000+ active customers
+
+Key Risks:
+- Regulatory changes in payment processing (mitigation: dedicated compliance team)
+- Stripe launching competing embedded product (mitigation: focus on mid-market, superior developer experience)
+- Talent retention in competitive market (mitigation: equity refresh program, competitive salaries)
+
+Exit Strategy: Preferred path is IPO in 2029. Backup: strategic acquisition by Visa, Mastercard, or major banking platform. Minimum acceptable acquisition price: $500M.

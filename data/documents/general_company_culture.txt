@@ -1,0 +1,24 @@
+NexaFin Technologies - Our Culture and Values
+
+Our Mission: Make payment processing simple, reliable, and accessible for every software company.
+
+Core Values:
+1. Build Trust First - We handle people's money. Every decision starts with "does this protect our customers?" Security isn't a feature, it's our foundation.
+
+2. Ship and Iterate - Perfect is the enemy of done. Launch with quality, then improve based on real feedback. We'd rather ship a good feature this week than a perfect one next month.
+
+3. Own Your Work - No finger-pointing. If something breaks on your watch, you fix it and share what you learned. Blameless post-mortems, not blame games.
+
+4. Default to Transparency - Share context, not just conclusions. When everyone understands the why, they make better decisions. Monthly all-hands with real financials, not just highlights.
+
+5. Respect Everyone's Time - Meetings have agendas or they don't happen. No meeting Wednesdays. Async communication first, meetings second. If it can be a Slack message, don't schedule a call.
+
+Team Traditions:
+- Monday standup (15 min, all-company, virtual)
+- No Meeting Wednesday (deep work day)
+- Friday demos (teams show what they shipped)
+- Monthly all-hands (CEO shares company updates, financials, and roadmap)
+- Quarterly hackathons (2 days, cross-functional teams)
+- Annual company offsite (3 days, mix of strategy and fun)
+
+Diversity and Inclusion: We hire based on skills and potential, not pedigrees. Our team spans 12 countries and 8 time zones. We actively recruit from non-traditional backgrounds and support employee resource groups.

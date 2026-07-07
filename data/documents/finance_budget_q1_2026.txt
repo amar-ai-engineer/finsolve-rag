@@ -1,0 +1,25 @@
+NexaFin Technologies - Q1 2026 Budget Report
+
+Total Revenue: $4.2M (up 18% from Q4 2025)
+Operating Expenses: $3.1M
+Net Profit: $1.1M (26% margin)
+
+Revenue Breakdown:
+- Subscription fees: $2.8M (67% of revenue)
+- Transaction processing: $0.9M (21%)
+- Enterprise licensing: $0.5M (12%)
+
+Major Expenses:
+- Engineering salaries: $1.4M (45% of OpEx)
+- Cloud infrastructure (AWS): $420K
+- Marketing spend: $380K
+- Office rent and utilities: $210K
+- Legal and compliance: $180K
+- HR and recruitment: $150K
+
+Cash position as of March 31, 2026: $8.7M
+Burn rate: $2.1M/month (reduced from $2.4M in Q3 2025)
+Runway: 4.1 months at current burn rate
+
+Q2 2026 Budget Allocation:
+Engineering is approved for 3 new hires (2 backend, 1 ML engineer) at estimated $45K/month total. Marketing budget increased to $450K for the product launch campaign. All other departments maintain current budgets.

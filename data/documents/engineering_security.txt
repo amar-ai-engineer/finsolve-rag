@@ -1,0 +1,13 @@
+NexaFin Technologies - Security Protocols
+
+Compliance: NexaFin is PCI DSS Level 1 certified and SOC 2 Type II compliant. Annual audits conducted by Deloitte. GDPR compliant for European customer data.
+
+Authentication: All internal systems use SSO via Okta. MFA required for all employees (hardware keys for engineering, authenticator app for others). API authentication via OAuth 2.0 with short-lived tokens (15-minute expiry) and refresh tokens (7-day expiry).
+
+Data Encryption: All data encrypted at rest (AES-256) and in transit (TLS 1.3). Payment card data tokenized immediately upon receipt - raw card numbers never stored. Database encryption keys managed by AWS KMS with automatic rotation every 90 days.
+
+Access Control: Principle of least privilege enforced. Production database access limited to on-call engineers and DBAs. All production access logged and reviewed weekly. Secrets stored in AWS Secrets Manager, never in code repositories. Git hooks prevent commits containing API keys or credentials.
+
+Incident Response: Severity levels P1 (data breach), P2 (service outage), P3 (degraded performance), P4 (minor issue). P1 incidents: immediate notification to CISO, CEO, and legal. Response team assembles within 15 minutes. Post-mortem required within 48 hours for all P1 and P2 incidents.
+
+Penetration Testing: Quarterly external pen tests by HackerOne. Bug bounty program with rewards up to $10,000 for critical vulnerabilities. All findings remediated within SLA: Critical (24 hours), High (72 hours), Medium (2 weeks), Low (next sprint).

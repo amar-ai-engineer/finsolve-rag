@@ -1,0 +1,23 @@
+NexaFin Technologies - System Architecture Overview
+
+Tech Stack:
+- Backend: Python (FastAPI) + Go (payment processing microservices)
+- Frontend: React + TypeScript, Next.js for marketing site
+- Database: PostgreSQL (primary), Redis (caching and sessions)
+- Message Queue: Apache Kafka for event streaming
+- Infrastructure: AWS (us-east-1 primary, eu-west-1 secondary)
+- CI/CD: GitHub Actions, ArgoCD for Kubernetes deployments
+- Monitoring: Datadog APM, PagerDuty for alerting
+
+Architecture: Microservices deployed on Amazon EKS (Kubernetes). Services communicate via gRPC internally and REST APIs externally. Event-driven architecture using Kafka for async processing.
+
+Key Services:
+- Payment Gateway (Go): Handles transaction processing, 99.99% uptime SLA
+- Account Service (Python): User management, KYC/AML verification
+- Billing Engine (Python): Subscription management, invoicing, revenue tracking
+- Notification Service (Python): Email, SMS, webhooks via SNS/SQS
+- API Gateway (Kong): Rate limiting, authentication, request routing
+
+Database Strategy: Each microservice owns its database (database per service pattern). Cross-service queries go through API calls, never direct DB access. Read replicas in eu-west-1 for European customers. Daily backups retained for 30 days, point-in-time recovery enabled.
+
+Deployment: Blue-green deployments for zero-downtime releases. Feature flags via LaunchDarkly. Canary releases for payment-critical services (1% traffic for 24 hours before full rollout).
