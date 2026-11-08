@@ -85,17 +85,27 @@ def chunk_documents(documents: list, chunk_size: int = 500, chunk_overlap: int =
     return chunks
 
 
-def build_vectorstore(chunks: list, persist_dir: str) -> Chroma:
+def build_vectorstore(
+    chunks: list,
+    persist_dir: str | None = None,
+    embeddings=None,
+    client=None,
+) -> Chroma:
     """
     Create a Chroma vector database from document chunks.
+
+    `embeddings` and `client` are optional so tests can inject a fake
+    embedding model and an in-memory Chroma client. By default the real
+    MiniLM model and a PersistentClient at `persist_dir` are used.
     """
-    embeddings = get_embedding_model()
+    if embeddings is None:
+        embeddings = get_embedding_model()
+    if client is None:
+        # Use PersistentClient for ChromaDB 1.x compatibility
+        client = chromadb.PersistentClient(path=persist_dir)
 
     texts = [c["text"] for c in chunks]
     metadatas = [c["metadata"] for c in chunks]
-
-    # Use PersistentClient for ChromaDB 1.x compatibility
-    client = chromadb.PersistentClient(path=persist_dir)
 
     vectorstore = Chroma.from_texts(
         texts=texts,
@@ -108,9 +118,10 @@ def build_vectorstore(chunks: list, persist_dir: str) -> Chroma:
     return vectorstore
 
 
-def load_vectorstore(persist_dir: str) -> Chroma:
+def load_vectorstore(persist_dir: str, embeddings=None) -> Chroma:
     """Load existing vector database from disk."""
-    embeddings = get_embedding_model()
+    if embeddings is None:
+        embeddings = get_embedding_model()
     client = chromadb.PersistentClient(path=persist_dir)
     return Chroma(
         client=client,
