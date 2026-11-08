@@ -44,7 +44,7 @@ All demo accounts use the password `demo123`. These are **demo credentials store
 
 Work in progress, tracked in this repo's pull requests:
 
-- **Access-control tests**: for every role, prove that no query (including prompt-injection attempts) returns a chunk from a department the role cannot access.
+- **Access-control tests** ([`tests/test_rbac.py`](tests/test_rbac.py), run in CI on every PR): for each of the 6 roles, normal, cross-department and prompt-injection queries are run against a real ChromaDB collection built from `data/documents`, and the test fails if any returned chunk belongs to a department outside the role's allowed list. Unknown roles must fall back to `general`, and the Python fallback path (store rejects metadata filters) is tested too. The tests use a deterministic hashing embedding instead of MiniLM, because the guarantee comes from the metadata filter, not from embedding quality, and this keeps them offline.
 - **Retrieval quality**: a golden set of questions with known source documents, reporting hit@k and MRR (how often, and how high, the right document is retrieved).
 
 Numbers will be added here only once they are produced by the evaluation scripts in this repository.
@@ -72,6 +72,16 @@ streamlit run app.py
 
 The first run downloads the embedding model and builds the vector store in `data/vectorstore/`.
 
+### Run the tests
+
+```bash
+pip install -r requirements-dev.txt
+ruff check .
+pytest
+```
+
+The tests do not need an API key or the embedding model download.
+
 ## Project structure
 
 ```
@@ -82,6 +92,8 @@ finsolve-rag/
 │   ├── document_loader.py  # Load, chunk, embed, persist to ChromaDB
 │   └── rag_chain.py        # RBAC-filtered retrieval + grounded generation
 ├── data/documents/         # 12 sample company documents across 6 departments
+├── tests/                  # RBAC leak tests (offline, fake embeddings)
+├── .github/workflows/ci.yml  # ruff + pytest on every push and PR
 ├── requirements.txt        # Pinned runtime dependencies
 └── requirements-dev.txt    # + test dependencies
 ```

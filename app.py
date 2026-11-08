@@ -3,18 +3,16 @@ FinSolve - Secure AI Assistant with Role-Based Access Control
 A RAG chatbot where each department sees ONLY their authorized data.
 """
 
-import streamlit as st
 import os
 import sys
 
+import streamlit as st
+
 sys.path.insert(0, os.path.dirname(__file__))
 
-from src.auth import authenticate, ROLES, DEMO_USERS
-from src.document_loader import (
-    load_documents, chunk_documents, build_vectorstore, load_vectorstore
-)
+from src.auth import DEMO_USERS, ROLES, authenticate
+from src.document_loader import build_vectorstore, chunk_documents, load_documents, load_vectorstore
 from src.rag_chain import ask_question
-
 
 # ---------- Page Config ----------
 st.set_page_config(
