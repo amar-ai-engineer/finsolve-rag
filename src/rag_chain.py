@@ -3,12 +3,12 @@ RAG chain - retrieval + generation with RBAC filtering.
 """
 
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from src.document_loader import load_vectorstore
-from src.auth import get_allowed_departments
 
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+from src.auth import get_allowed_departments
 
 # System prompt that prevents prompt injection and data leakage
 SYSTEM_PROMPT = """You are FinSolve AI, a secure assistant for NexaFin Technologies.

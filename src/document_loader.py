@@ -3,10 +3,11 @@ Document loading, chunking, and embedding for the RAG pipeline.
 """
 
 import os
+
 import chromadb
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 def get_embedding_model():
@@ -43,7 +44,7 @@ def load_documents(docs_dir: str) -> list:
         if not filename.endswith(".txt"):
             continue
         filepath = os.path.join(docs_dir, filename)
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             text = f.read().strip()
 
         if text:
