@@ -1,0 +1,55 @@
+name: Eval
+
+# Retrieval evaluation with the REAL embedding model (all-MiniLM-L6-v2).
+# Kept separate from CI because it downloads the model from the Hugging Face Hub.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "eval/**"
+      - "src/**"
+      - "data/documents/**"
+      - ".github/workflows/eval.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  retrieval-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+
+      - name: Run retrieval evaluation
+        env:
+          ANONYMIZED_TELEMETRY: "False"
+        # Exits non-zero (fails the job) if the leak rate is not 0.
+        run: python -m eval.run_eval
+
+      - name: Add results to the job summary
+        if: always()
+        run: |
+          if [ -f eval/results.md ]; then cat eval/results.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: |
+            eval/results.md
+            eval/results.json
+          if-no-files-found: warn
