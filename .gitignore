@@ -21,3 +21,6 @@ Thumbs.db
 
 PRESENTATION.md
 TEACHING_NOTES.md
+# Eval outputs (published by the Eval workflow as an artifact)
+eval/results.md
+eval/results.json
