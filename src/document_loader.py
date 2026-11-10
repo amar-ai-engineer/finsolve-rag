@@ -128,3 +128,21 @@ def load_vectorstore(persist_dir: str, embeddings=None) -> Chroma:
         collection_name="finsolve_docs",
         embedding_function=embeddings,
     )
+
+
+def load_or_build_vectorstore(docs_dir: str, persist_dir: str) -> Chroma | None:
+    """
+    Load the persisted vector store, or build it from the documents on first run.
+
+    Shared by the Streamlit app and the API so both index documents the same way.
+    Returns None if there are no documents to index.
+    """
+    if os.path.exists(os.path.join(persist_dir, "chroma.sqlite3")):
+        return load_vectorstore(persist_dir)
+
+    docs = load_documents(docs_dir)
+    if not docs:
+        return None
+
+    chunks = chunk_documents(docs, chunk_size=500, chunk_overlap=100)
+    return build_vectorstore(chunks, persist_dir)
