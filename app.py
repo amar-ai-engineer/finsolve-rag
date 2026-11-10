@@ -11,7 +11,7 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(__file__))
 
 from src.auth import DEMO_USERS, ROLES, authenticate
-from src.document_loader import build_vectorstore, chunk_documents, load_documents, load_vectorstore
+from src.document_loader import load_or_build_vectorstore
 from src.rag_chain import ask_question
 
 # ---------- Page Config ----------
@@ -152,18 +152,8 @@ VECTORSTORE_DIR = os.path.join(os.path.dirname(__file__), "data", "vectorstore")
 
 @st.cache_resource
 def setup_vectorstore():
-    """Build or load the vector store."""
-    if os.path.exists(os.path.join(VECTORSTORE_DIR, "chroma.sqlite3")):
-        return load_vectorstore(VECTORSTORE_DIR)
-
-    # Build from documents
-    docs = load_documents(DOCS_DIR)
-    if not docs:
-        return None
-
-    chunks = chunk_documents(docs, chunk_size=500, chunk_overlap=100)
-    vectorstore = build_vectorstore(chunks, VECTORSTORE_DIR)
-    return vectorstore
+    """Build or load the vector store (same code path as the API)."""
+    return load_or_build_vectorstore(DOCS_DIR, VECTORSTORE_DIR)
 
 
 # ============================================

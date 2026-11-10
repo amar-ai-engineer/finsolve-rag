@@ -99,13 +99,19 @@ def ask_question(
     user_name: str,
     vectorstore,
     chat_history: list = None,
+    llm=None,
 ) -> dict:
     """
     Main RAG function - retrieve context, generate answer.
 
+    `llm` is optional so the API and tests can pass in their own chat model
+    (tests use a fake one that never calls the network). By default the
+    Gemini model from get_llm() is used.
+
     Returns dict with answer, sources, and metadata.
     """
-    llm = get_llm()
+    if llm is None:
+        llm = get_llm()
 
     if llm is None:
         return {

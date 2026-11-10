@@ -38,7 +38,7 @@ flowchart LR
 | `ceo` | Executive | all departments, including board minutes |
 | `intern` | Employee | general only |
 
-All demo accounts use the password `demo123`. These are **demo credentials stored in code**; see *Limitations*.
+All demo accounts use the password `demo123`. Passwords are stored as **bcrypt hashes** in [`src/auth.py`](src/auth.py), not in plaintext, but the user list itself is still hard-coded for the demo; see *Limitations*.
 
 ## Evaluation
 
@@ -79,6 +79,7 @@ python -m eval.run_eval            # writes eval/results.md and eval/results.jso
 | Embeddings | `all-MiniLM-L6-v2` (sentence-transformers) | Small, fast on CPU, free |
 | LLM | Google Gemini 2.5 Flash | Low cost, good instruction following |
 | UI | Streamlit | Login + chat interface in one file |
+| API | FastAPI + PyJWT + bcrypt | Same pipeline over HTTP, role taken from a signed token |
 
 ## Run it
 
@@ -93,6 +94,34 @@ streamlit run app.py
 
 The first run downloads the embedding model and builds the vector store in `data/vectorstore/`.
 
+### Run the API
+
+The same pipeline is available as an HTTP service ([`api/main.py`](api/main.py)). It needs `GOOGLE_API_KEY` and a token signing secret, `FINSOLVE_JWT_SECRET` (at least 32 characters; both can go in `.env`):
+
+```bash
+export FINSOLVE_JWT_SECRET=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+uvicorn api.main:app --reload
+
+# 1. Log in: returns a signed JWT valid for 1 hour
+TOKEN=$(curl -s -X POST localhost:8000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username": "intern", "password": "demo123"}' | python -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+
+# 2. Ask: the role comes from the token, never from the request body
+curl -s -X POST localhost:8000/ask \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"question": "What are the office guidelines?"}'
+# -> {"answer": "...", "sources": ["<file>.txt", ...], "chunks_retrieved": <n>}
+```
+
+| Endpoint | Auth | Returns |
+|---|---|---|
+| `POST /auth/login` | none | `access_token`, `token_type`, `expires_in` (3600), `role`; 401 on bad credentials |
+| `POST /ask` | `Authorization: Bearer <token>` | `answer`, `sources`, `chunks_retrieved`; 401 if the token is missing, invalid or expired |
+| `GET /health` | none | `{"status": "ok"}` |
+
+Interactive docs are at `http://localhost:8000/docs`. The Streamlit app and the API share [`src/auth.py`](src/auth.py), so they check passwords and map roles to departments the same way.
+
 ### Run the tests
 
 ```bash
@@ -101,20 +130,22 @@ ruff check .
 pytest
 ```
 
-The tests do not need an API key or the embedding model download.
+The tests do not need an API key or the embedding model download: they use fake embeddings and, for the API tests ([`tests/test_api.py`](tests/test_api.py)), a fake chat model.
 
 ## Project structure
 
 ```
 finsolve-rag/
 ├── app.py                  # Streamlit UI: login + chat
+├── api/
+│   └── main.py             # FastAPI service: /auth/login, /ask, /health
 ├── src/
-│   ├── auth.py             # Roles, allowed departments, demo login
+│   ├── auth.py             # Roles, allowed departments, bcrypt login, JWT helpers
 │   ├── document_loader.py  # Load, chunk, embed, persist to ChromaDB
 │   └── rag_chain.py        # RBAC-filtered retrieval + grounded generation
 ├── data/documents/         # 12 sample company documents across 6 departments
 ├── eval/                   # Golden set + retrieval evaluation (hit@k, MRR, leak rate)
-├── tests/                  # RBAC leak tests + eval checks (offline, fake embeddings)
+├── tests/                  # RBAC leak tests, API/auth tests, eval checks (offline)
 ├── .github/workflows/
 │   ├── ci.yml              # ruff + pytest on every push and PR
 │   └── eval.yml            # retrieval eval with the real model on PRs touching src/eval/data
@@ -128,10 +159,12 @@ finsolve-rag/
 - **Department from file naming convention.** Simple and transparent for a demo. A production system would take it from the document management system's ACLs.
 - **Short chat memory (last 3 exchanges).** Keeps follow-up questions working without letting the context grow without limit.
 - **Low temperature (0.3).** Favors answers that stay close to the retrieved text.
+- **Role from the token, not the request.** `POST /ask` accepts only a question. The role is a claim inside a JWT the server signed at login, so a client cannot ask for a different role, and editing the token breaks its signature.
 
 ## Limitations
 
-- Demo authentication only: plaintext passwords in code, no sessions or tokens. A production version needs a real identity provider (OIDC/SSO) or at least hashed passwords and signed tokens.
+- Demo user store: users and their bcrypt hashes are hard-coded in `src/auth.py`. A production version would use a real identity provider (OIDC/SSO) or a user database.
+- Tokens are short-lived (1 hour) but cannot be revoked before they expire, and there are no refresh tokens. The Streamlit app keeps its login in the Streamlit session rather than using tokens.
 - Access rules are per department. Real organizations also need per-document and per-user permissions.
 - Sample documents are synthetic and small (12 files), so retrieval quality numbers will not transfer directly to a real corpus.
 - No rate limiting, audit logging or PII redaction yet.
