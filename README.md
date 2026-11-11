@@ -122,6 +122,25 @@ curl -s -X POST localhost:8000/ask \
 
 Interactive docs are at `http://localhost:8000/docs`. The Streamlit app and the API share [`src/auth.py`](src/auth.py), so they check passwords and map roles to departments the same way.
 
+### Run with Docker
+
+Runs the API and the Streamlit UI in containers ([`Dockerfile`](Dockerfile), [`docker-compose.yml`](docker-compose.yml)). Only Docker is needed on your machine:
+
+```bash
+cp .env.example .env   # set GOOGLE_API_KEY and FINSOLVE_JWT_SECRET
+docker compose up --build
+# API: http://localhost:8000/docs   UI: http://localhost:8501
+docker compose ps      # both services should show "healthy" after ~30 s
+```
+
+- **One image, two services.** `api` runs uvicorn, `ui` runs Streamlit. The UI does not call the API; both use the same code in `src/`, so they enforce the same access rules.
+- **Model and index baked in.** The build downloads `all-MiniLM-L6-v2` and builds the Chroma index from `data/documents/`, so containers start without internet access (`HF_HUB_OFFLINE=1`) and nothing is shared between them. Changing a document means rebuilding the image.
+- **CPU-only torch.** The default PyPI torch wheel bundles CUDA libraries (several GB) that a CPU container never uses.
+- **Non-root user.** The process runs as `appuser` (uid 1000) and can write only to `data/` and the model cache, not to the code.
+- **Healthchecks** on `GET /health` (API) and Streamlit's `/_stcore/health`. Compose refuses to start if `FINSOLVE_JWT_SECRET` is not set.
+
+CI builds the image on every PR and checks that it runs as non-root, answers a retrieval query with networking disabled, and that the API container becomes healthy and accepts a login.
+
 ### Run the tests
 
 ```bash
@@ -147,8 +166,10 @@ finsolve-rag/
 ├── eval/                   # Golden set + retrieval evaluation (hit@k, MRR, leak rate)
 ├── tests/                  # RBAC leak tests, API/auth tests, eval checks (offline)
 ├── .github/workflows/
-│   ├── ci.yml              # ruff + pytest on every push and PR
+│   ├── ci.yml              # ruff + pytest, docker build + smoke test, on every push and PR
 │   └── eval.yml            # retrieval eval with the real model on PRs touching src/eval/data
+├── Dockerfile              # One image for API and UI; model + index baked in
+├── docker-compose.yml      # api (port 8000) and ui (port 8501) with healthchecks
 ├── requirements.txt        # Pinned runtime dependencies
 └── requirements-dev.txt    # + test dependencies
 ```
