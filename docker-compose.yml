@@ -1,0 +1,43 @@
+# docker compose up --build
+#   API: http://localhost:8000/docs     UI: http://localhost:8501
+#
+# Values come from a .env file next to this one (copy .env.example).
+# Both services are built from the same Dockerfile and each has its own copy
+# of the baked-in index. The UI does not call the API: both use the same
+# Python code (src/) directly, so they can be started independently.
+
+services:
+  api:
+    build: .
+    image: finsolve-rag:local
+    ports:
+      - "8000:8000"
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      # The API refuses to start without a signing secret, so fail here with a clear message.
+      FINSOLVE_JWT_SECRET: ${FINSOLVE_JWT_SECRET:?Set FINSOLVE_JWT_SECRET in .env (see .env.example)}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+
+  ui:
+    # Same build as `api`; the second build is served from the layer cache.
+    build: .
+    image: finsolve-rag:local
+    command: ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+    ports:
+      - "8501:8501"
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+    healthcheck:
+      # Streamlit's built-in health endpoint.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped

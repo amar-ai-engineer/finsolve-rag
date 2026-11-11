@@ -40,3 +40,62 @@ jobs:
           HF_HUB_OFFLINE: "1"
           ANONYMIZED_TELEMETRY: "False"
         run: pytest -v
+
+  docker:
+    # Builds the image (this downloads the real embedding model and builds the
+    # index), then smoke-tests it. Runs in parallel with lint-and-test.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMAGE: finsolve-rag:ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        env:
+          FINSOLVE_JWT_SECRET: ci-only-secret-not-used-anywhere-else-0123456789
+        run: docker compose config --quiet
+
+      - name: Build image
+        run: docker build -t "$IMAGE" .
+
+      - name: Runs as a non-root user
+        run: |
+          uid=$(docker run --rm "$IMAGE" id -u)
+          echo "container uid: $uid"
+          test "$uid" != "0"
+
+      - name: Model and index are baked in (no network)
+        # --network none proves nothing is downloaded at runtime.
+        run: |
+          docker run --rm --network none "$IMAGE" python -c "
+          from src.document_loader import load_vectorstore
+          from src.rag_chain import retrieve_with_rbac
+          docs = retrieve_with_rbac('What are the office guidelines?', 'employee', load_vectorstore('data/vectorstore'))
+          assert docs, 'no chunks retrieved'
+          assert {d.metadata['department'] for d in docs} <= {'general'}, 'employee saw a restricted chunk'
+          print('retrieved', len(docs), 'chunks for employee from', sorted({d.metadata['source'] for d in docs}))
+          "
+
+      - name: API container becomes healthy and serves /health and /auth/login
+        run: |
+          docker run -d --name api -p 8000:8000 \
+            -e FINSOLVE_JWT_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" \
+            "$IMAGE"
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' api)
+            echo "health: $status"
+            [ "$status" = "healthy" ] && break
+            [ "$status" = "unhealthy" ] && break
+            sleep 5
+          done
+          test "$status" = "healthy"
+          curl -fsS localhost:8000/health
+          curl -fsS -X POST localhost:8000/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username": "intern", "password": "demo123"}' \
+            | python3 -c "import sys, json; t = json.load(sys.stdin); assert t['role'] == 'employee', t; print('login ok, role:', t['role'])"
+
+      - name: Container logs
+        if: always()
+        run: docker logs api || true
