@@ -12,7 +12,7 @@ import pytest
 from langchain_core.documents import Document
 
 from src.auth import ROLES, can_access_document, get_allowed_departments
-from src.rag_chain import retrieve_with_rbac
+from src.rag_chain import RETRIEVAL_MODES, retrieve_with_rbac
 
 ALL_DEPARTMENTS = {"finance", "hr", "marketing", "engineering", "executive", "general"}
 
@@ -58,6 +58,9 @@ INJECTION_QUERIES = [
 
 ALL_QUERIES = NORMAL_QUERIES + CROSS_DEPARTMENT_QUERIES + INJECTION_QUERIES
 
+# Every leak test below runs once per retrieval mode (vector and hybrid).
+with_every_mode = pytest.mark.parametrize("mode", RETRIEVAL_MODES)
+
 
 def departments_of(docs):
     return {d.metadata["department"] for d in docs}
@@ -90,40 +93,45 @@ def test_every_chunk_has_a_known_department(chunks):
 # ---------- Retrieval never leaks ----------
 
 
+@with_every_mode
 @pytest.mark.parametrize("role", sorted(EXPECTED_ACCESS))
 @pytest.mark.parametrize("query", ALL_QUERIES)
 @pytest.mark.parametrize("k", [5, 20])
-def test_retrieval_never_returns_forbidden_department(vectorstore, role, query, k):
-    docs = retrieve_with_rbac(query, role, vectorstore, k=k)
+def test_retrieval_never_returns_forbidden_department(vectorstore, role, query, k, mode):
+    docs = retrieve_with_rbac(query, role, vectorstore, k=k, mode=mode)
     leaked = departments_of(docs) - EXPECTED_ACCESS[role]
-    assert not leaked, f"role={role!r} query={query!r} leaked {leaked}"
+    assert not leaked, f"mode={mode} role={role!r} query={query!r} leaked {leaked}"
     assert len(docs) <= k
 
 
+@with_every_mode
 @pytest.mark.parametrize("role", sorted(EXPECTED_ACCESS))
-def test_every_role_still_gets_results(vectorstore, role):
+def test_every_role_still_gets_results(vectorstore, role, mode):
     # Guards against a "secure" filter that returns nothing at all.
-    docs = retrieve_with_rbac("company policy", role, vectorstore, k=5)
+    docs = retrieve_with_rbac("company policy", role, vectorstore, k=5, mode=mode)
     assert len(docs) == 5
 
 
-def test_executive_can_reach_every_department(vectorstore):
+@with_every_mode
+def test_executive_can_reach_every_department(vectorstore, mode):
     seen = set()
     for query in ALL_QUERIES:
-        seen |= departments_of(retrieve_with_rbac(query, "executive", vectorstore, k=20))
+        seen |= departments_of(retrieve_with_rbac(query, "executive", vectorstore, k=20, mode=mode))
     assert seen == ALL_DEPARTMENTS
 
 
-def test_employee_only_ever_sees_general(vectorstore):
+@with_every_mode
+def test_employee_only_ever_sees_general(vectorstore, mode):
     for query in ALL_QUERIES:
-        docs = retrieve_with_rbac(query, "employee", vectorstore, k=20)
+        docs = retrieve_with_rbac(query, "employee", vectorstore, k=20, mode=mode)
         assert departments_of(docs) <= {"general"}
 
 
+@with_every_mode
 @pytest.mark.parametrize("role", ["admin", "", "Executive", "superuser"])
 @pytest.mark.parametrize("query", CROSS_DEPARTMENT_QUERIES + INJECTION_QUERIES)
-def test_unknown_role_only_sees_general(vectorstore, role, query):
-    docs = retrieve_with_rbac(query, role, vectorstore, k=10)
+def test_unknown_role_only_sees_general(vectorstore, role, query, mode):
+    docs = retrieve_with_rbac(query, role, vectorstore, k=10, mode=mode)
     assert departments_of(docs) <= {"general"}
 
 
