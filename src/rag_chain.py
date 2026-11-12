@@ -49,8 +49,10 @@ def get_llm():
 # Retrieval mode, set with the FINSOLVE_RETRIEVAL_MODE environment variable.
 #   vector: embedding similarity search only (the original behaviour)
 #   hybrid: vector search + BM25 keyword search, merged with reciprocal rank fusion
+# hybrid is the default because it scored higher on the retrieval eval
+# (eval/run_eval.py, real model; numbers in the README's Evaluation section).
 RETRIEVAL_MODES = ("vector", "hybrid")
-DEFAULT_RETRIEVAL_MODE = "vector"
+DEFAULT_RETRIEVAL_MODE = "hybrid"
 
 # How many candidates each search contributes before fusion in hybrid mode.
 HYBRID_CANDIDATES = 20

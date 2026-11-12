@@ -127,14 +127,14 @@ def test_rrf_with_empty_lists():
 # ---------- Mode switch ----------
 
 
-def test_default_mode_is_vector(monkeypatch):
+def test_default_mode_is_hybrid(monkeypatch):
     monkeypatch.delenv("FINSOLVE_RETRIEVAL_MODE", raising=False)
-    assert get_retrieval_mode() == "vector"
+    assert get_retrieval_mode() == "hybrid"
 
 
 def test_mode_from_environment(monkeypatch):
-    monkeypatch.setenv("FINSOLVE_RETRIEVAL_MODE", " Hybrid ")
-    assert get_retrieval_mode() == "hybrid"
+    monkeypatch.setenv("FINSOLVE_RETRIEVAL_MODE", " Vector ")
+    assert get_retrieval_mode() == "vector"
 
 
 def test_invalid_mode_fails_loudly(monkeypatch, vectorstore):

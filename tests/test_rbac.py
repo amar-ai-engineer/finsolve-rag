@@ -151,6 +151,8 @@ def test_filter_is_what_blocks_the_board_minutes(vectorstore):
 
 
 # ---------- Fallback path (filter not supported by the store) ----------
+# These tests pin mode="vector" because they test the vector search fallback.
+# The hybrid fallback is tested in tests/test_hybrid.py.
 
 
 class NoFilterStore:
@@ -176,7 +178,7 @@ class NoFilterStore:
 
 def test_fallback_filters_in_python_and_keeps_rank_order():
     store = NoFilterStore(["executive", "general", "finance", "general", "hr", "general", "executive", "general"])
-    docs = retrieve_with_rbac("anything", "employee", store, k=2)
+    docs = retrieve_with_rbac("anything", "employee", store, k=2, mode="vector")
 
     # First call tried the filter, second call fetched 3*k unfiltered.
     assert store.calls == [
@@ -190,7 +192,7 @@ def test_fallback_filters_in_python_and_keeps_rank_order():
 @pytest.mark.parametrize("role", sorted(EXPECTED_ACCESS) + ["unknown"])
 def test_fallback_never_leaks(role):
     store = NoFilterStore(sorted(ALL_DEPARTMENTS) * 5)
-    docs = retrieve_with_rbac("anything", role, store, k=5)
+    docs = retrieve_with_rbac("anything", role, store, k=5, mode="vector")
     allowed = EXPECTED_ACCESS.get(role, {"general"})
     assert departments_of(docs) <= allowed
     assert len(docs) <= 5
@@ -203,7 +205,7 @@ def test_fallback_can_return_fewer_than_k():
     That is the safe failure mode, and this test documents it.
     """
     store = NoFilterStore(["executive"] * 15 + ["general"] * 5)
-    assert retrieve_with_rbac("anything", "employee", store, k=5) == []
+    assert retrieve_with_rbac("anything", "employee", store, k=5, mode="vector") == []
 
 
 def test_fallback_on_real_chroma_store(vectorstore):
@@ -216,5 +218,5 @@ def test_fallback_on_real_chroma_store(vectorstore):
             return vectorstore.similarity_search(query, k=k)
 
     for query in CROSS_DEPARTMENT_QUERIES + INJECTION_QUERIES:
-        docs = retrieve_with_rbac(query, "marketing", RejectFilters(), k=5)
+        docs = retrieve_with_rbac(query, "marketing", RejectFilters(), k=5, mode="vector")
         assert departments_of(docs) <= {"marketing", "general"}
