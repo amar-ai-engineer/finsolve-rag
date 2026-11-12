@@ -11,9 +11,10 @@ import os
 
 import pytest
 
-from eval.run_eval import evaluate, first_rank, load_golden, summarize
+from eval.run_eval import evaluate, first_rank, load_golden, summarize, to_markdown
 from src.auth import ROLES, get_allowed_departments
 from src.document_loader import detect_department
+from src.rag_chain import RETRIEVAL_MODES
 from tests.conftest import DOCS_DIR
 
 GOLDEN = load_golden()
@@ -63,8 +64,21 @@ def test_summary_metrics_on_hand_made_rows():
     assert s["leak_rate"] == pytest.approx(1 / 4)
 
 
-def test_eval_end_to_end_never_leaks(vectorstore):
+@pytest.mark.parametrize("mode", RETRIEVAL_MODES)
+def test_eval_end_to_end_never_leaks(vectorstore, mode):
     """The full golden set through real Chroma filtering: zero unauthorized chunks."""
-    rows = evaluate(GOLDEN, vectorstore)
+    rows = evaluate(GOLDEN, vectorstore, mode=mode)
     assert len(rows) == len(GOLDEN)
     assert summarize(rows)["overall"]["leak_rate"] == 0
+
+
+def test_markdown_report_compares_modes(vectorstore):
+    results = {}
+    for mode in RETRIEVAL_MODES:
+        rows = evaluate(GOLDEN[:4], vectorstore, mode=mode)
+        results[mode] = {"summary": summarize(rows), "questions": rows}
+    md = to_markdown(results, {"generated_at": "now", "commit": None, "embeddings": "fake"})
+    assert "## Overall, by retrieval mode" in md
+    for mode in RETRIEVAL_MODES:
+        assert f"| **{mode}** |" in md
+        assert f"Rank ({mode})" in md
