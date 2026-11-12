@@ -12,7 +12,7 @@ FinSolve treats access control as a **retrieval problem, not a prompt problem**:
 
 1. Every chunk is stored with a `department` metadata field (finance, hr, marketing, engineering, executive, general).
 2. Each role maps to a list of allowed departments.
-3. The similarity search runs with a metadata filter (`department IN allowed_departments`), so unauthorized chunks are never returned to the application, and therefore never placed in the LLM's context.
+3. The similarity search runs with a metadata filter (`department IN allowed_departments`), so unauthorized chunks are never returned to the application, and therefore never placed in the LLM's context. In hybrid mode (the default, see [Retrieval modes](#retrieval-modes)) the BM25 keyword search is also built only from allowed chunks, before the two rankings are merged.
 4. The system prompt adds a second, weaker layer: answer only from the provided context, cite sources, refuse role-change requests.
 
 If the prompt layer fails, the model still has nothing sensitive to leak, because it was never given it.
@@ -21,11 +21,26 @@ If the prompt layer fails, the model still has nothing sensitive to leak, becaus
 flowchart LR
     U[User + role] --> Q[Question]
     Q --> R{{Vector search<br/>filter: department IN role.allowed}}
-    R -->|only authorized chunks| C[Context + citations]
+    Q --> B{{BM25 keyword search<br/>over allowed chunks only}}
+    R --> F[Reciprocal rank fusion]
+    B --> F
+    F -->|only authorized chunks| C[Context + citations]
     C --> L[Gemini 2.5 Flash<br/>grounded answer]
     L --> A[Answer + sources]
     D[(ChromaDB<br/>chunks + department metadata)] --> R
+    D --> B
 ```
+
+### Retrieval modes
+
+Set with `FINSOLVE_RETRIEVAL_MODE` (see [`.env.example`](.env.example)):
+
+| Mode | What it does |
+|---|---|
+| `hybrid` (default) | Runs the filtered vector search **and** a BM25 keyword search ([`src/hybrid.py`](src/hybrid.py), `rank-bm25`) over the chunks the role may see, takes the top 20 from each and merges them with **reciprocal rank fusion** (each chunk scores `sum(1 / (60 + rank))` over the lists it appears in). BM25 helps with exact terms like "Q1", "Series B" or a policy name that embeddings can blur. |
+| `vector` | Filtered vector similarity search only (the original behaviour). |
+
+The role filter is applied inside each search, **before** fusion, so the fusion step never sees a forbidden chunk. Hybrid became the default because it scored higher on the retrieval eval below.
 
 ## Roles
 
@@ -50,24 +65,31 @@ Work in progress, tracked in this repo's pull requests:
   - **MRR** (mean reciprocal rank): 1 / position of the first chunk from the expected document, averaged (0 if missing).
   - **Leak rate**: share of all 30 questions where any retrieved chunk is from a department the role may not see. The eval fails if this is not 0.
 
-Results from the [Eval workflow run on 2026-11-09](https://github.com/amar-ai-engineer/finsolve-rag/actions/runs/42573896137) (commit `7161e05`):
+Results from the [Eval workflow run on 2026-11-12](https://github.com/amar-ai-engineer/finsolve-rag/actions/runs/43167535713) (commit `294fd63`), both modes on the same index and golden set:
 
-| Scope | Questions | Answerable | hit@1 | hit@5 | MRR | Leak rate |
+| Mode | Questions | Answerable | hit@1 | hit@5 | MRR | Leak rate |
 |---|---|---|---|---|---|---|
-| **Overall** | 30 | 23 | 0.87 | 1.00 | 0.93 | 0.00 |
-| finance | 6 | 5 | 1.00 | 1.00 | 1.00 | 0.00 |
-| hr | 6 | 4 | 1.00 | 1.00 | 1.00 | 0.00 |
-| marketing | 4 | 3 | 1.00 | 1.00 | 1.00 | 0.00 |
-| engineering | 4 | 3 | 0.67 | 1.00 | 0.83 | 0.00 |
-| executive | 5 | 5 | 0.60 | 1.00 | 0.80 | 0.00 |
-| employee | 5 | 3 | 1.00 | 1.00 | 1.00 | 0.00 |
+| `vector` (before) | 30 | 23 | 0.87 | 1.00 | 0.93 | 0.00 |
+| `hybrid` (after, default) | 30 | 23 | 1.00 | 1.00 | 1.00 | 0.00 |
 
-How to read this: the right document always made the top 5, and in 3 of 23 questions it was 2nd rather than 1st (in two of those, a `general_company_culture.txt` chunk ranked first). The executive role is hardest because it searches all 12 documents, so the board minutes and the strategy plan compete on overlapping topics (Series B, acquisitions). With only 12 short synthetic documents these numbers are a sanity check, not a benchmark: they will not transfer to a large real corpus. The eval measures retrieval only, not the quality of Gemini's answers. The per-question breakdown is in the workflow's job summary and its `eval-results` artifact.
+Per role (hit@1 / MRR; hit@5 and leak rate are 1.00 / 0.00 for every role in both modes):
+
+| Role | vector | hybrid |
+|---|---|---|
+| finance | 1.00 / 1.00 | 1.00 / 1.00 |
+| hr | 1.00 / 1.00 | 1.00 / 1.00 |
+| marketing | 1.00 / 1.00 | 1.00 / 1.00 |
+| engineering | 0.67 / 0.83 | 1.00 / 1.00 |
+| executive | 0.60 / 0.80 | 1.00 / 1.00 |
+| employee | 1.00 / 1.00 | 1.00 / 1.00 |
+
+How to read this: in vector mode the right document always made the top 5, but in 3 of 23 questions it was 2nd rather than 1st (`eng-03`, `exec-02`, `exec-03`; in two of them a `general_company_culture.txt` chunk ranked first). Hybrid moved all three to rank 1 and changed no other question's rank. That is a real but small difference: **3 questions out of 23**, on 12 short synthetic documents, so treat it as "hybrid did not hurt and fixed the known misses", not as a general 13-point improvement. hit@k also only checks the *first* matching chunk; in some hybrid top-5 lists the lower positions hold more `general_*` chunks than vector mode did, which these metrics do not measure. The eval measures retrieval only, not the quality of Gemini's answers. The full per-question breakdown for both modes is in the workflow's job summary and its `eval-results` artifact.
 
 Run it yourself (downloads the embedding model on first run, no API key needed):
 
 ```bash
-python -m eval.run_eval            # writes eval/results.md and eval/results.json
+python -m eval.run_eval                 # both modes; writes eval/results.md and eval/results.json
+python -m eval.run_eval --modes vector  # one mode only
 ```
 
 ## Tech stack
@@ -77,6 +99,7 @@ python -m eval.run_eval            # writes eval/results.md and eval/results.jso
 | Orchestration | LangChain (core, text splitters) | Simple, well-known RAG building blocks |
 | Vector store | ChromaDB (local, persistent) | Metadata filtering built in, no server to run |
 | Embeddings | `all-MiniLM-L6-v2` (sentence-transformers) | Small, fast on CPU, free |
+| Keyword search | BM25 (`rank-bm25`) + reciprocal rank fusion | Catches exact terms embeddings miss; RRF merges rankings without comparing raw scores |
 | LLM | Google Gemini 2.5 Flash | Low cost, good instruction following |
 | UI | Streamlit | Login + chat interface in one file |
 | API | FastAPI + PyJWT + bcrypt | Same pipeline over HTTP, role taken from a signed token |
@@ -161,7 +184,8 @@ finsolve-rag/
 ├── src/
 │   ├── auth.py             # Roles, allowed departments, bcrypt login, JWT helpers
 │   ├── document_loader.py  # Load, chunk, embed, persist to ChromaDB
-│   └── rag_chain.py        # RBAC-filtered retrieval + grounded generation
+│   ├── hybrid.py           # BM25 over allowed chunks + reciprocal rank fusion
+│   └── rag_chain.py        # RBAC-filtered retrieval (vector or hybrid) + grounded generation
 ├── data/documents/         # 12 sample company documents across 6 departments
 ├── eval/                   # Golden set + retrieval evaluation (hit@k, MRR, leak rate)
 ├── tests/                  # RBAC leak tests, API/auth tests, eval checks (offline)
@@ -177,6 +201,8 @@ finsolve-rag/
 ## Design decisions
 
 - **Filter in the database, not after retrieval.** Post-filtering (retrieve top-k, then drop unauthorized chunks) can silently return fewer than k results, or none, for restricted roles. Filtering inside the search keeps k authorized results.
+- **Filter before fusion.** In hybrid mode both searches are restricted to the role's departments before their rankings are merged. Fusing first and filtering afterwards would work for correctness but has the same "fewer than k results" problem as post-filtering, and makes the access check depend on one final step being right.
+- **Rank fusion instead of score blending.** Cosine distances and BM25 scores are on different scales, so adding them needs tuning weights. RRF only uses each chunk's rank, has one standard constant (60) and needs no tuning on a 30-question set.
 - **Department from file naming convention.** Simple and transparent for a demo. A production system would take it from the document management system's ACLs.
 - **Short chat memory (last 3 exchanges).** Keeps follow-up questions working without letting the context grow without limit.
 - **Low temperature (0.3).** Favors answers that stay close to the retrieved text.
@@ -188,6 +214,7 @@ finsolve-rag/
 - Tokens are short-lived (1 hour) but cannot be revoked before they expire, and there are no refresh tokens. The Streamlit app keeps its login in the Streamlit session rather than using tokens.
 - Access rules are per department. Real organizations also need per-document and per-user permissions.
 - Sample documents are synthetic and small (12 files), so retrieval quality numbers will not transfer directly to a real corpus.
+- The BM25 index is rebuilt from the allowed chunks on every query. That costs little for ~100 chunks but would need a cached per-role index (or a search engine with built-in BM25) for a large corpus. The tokenizer is deliberately simple: lowercase words, no stemming or stopword list.
 - No rate limiting, audit logging or PII redaction yet.
 
 ## Built by
