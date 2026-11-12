@@ -9,6 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from src.auth import get_allowed_departments
+from src.hybrid import bm25_search, reciprocal_rank_fusion
 
 # System prompt that prevents prompt injection and data leakage
 SYSTEM_PROMPT = """You are FinSolve AI, a secure assistant for NexaFin Technologies.
@@ -45,12 +46,26 @@ def get_llm():
     )
 
 
-def retrieve_with_rbac(query: str, role: str, vectorstore, k: int = 5) -> list:
-    """
-    Retrieve relevant chunks filtered by RBAC permissions.
-    """
-    allowed_depts = get_allowed_departments(role)
+# Retrieval mode, set with the FINSOLVE_RETRIEVAL_MODE environment variable.
+#   vector: embedding similarity search only (the original behaviour)
+#   hybrid: vector search + BM25 keyword search, merged with reciprocal rank fusion
+RETRIEVAL_MODES = ("vector", "hybrid")
+DEFAULT_RETRIEVAL_MODE = "vector"
 
+# How many candidates each search contributes before fusion in hybrid mode.
+HYBRID_CANDIDATES = 20
+
+
+def get_retrieval_mode() -> str:
+    """Read the retrieval mode from the environment; fail loudly on a typo."""
+    mode = os.getenv("FINSOLVE_RETRIEVAL_MODE", DEFAULT_RETRIEVAL_MODE).strip().lower()
+    if mode not in RETRIEVAL_MODES:
+        raise ValueError(f"FINSOLVE_RETRIEVAL_MODE must be one of {RETRIEVAL_MODES}, got {mode!r}")
+    return mode
+
+
+def _vector_search(query: str, allowed_depts: list[str], vectorstore, k: int) -> list:
+    """Similarity search restricted to the allowed departments."""
     # Use Chroma's built-in metadata filter
     # This is more efficient than post-filtering
     filter_dict = {"department": {"$in": allowed_depts}}
@@ -70,6 +85,28 @@ def retrieve_with_rbac(query: str, role: str, vectorstore, k: int = 5) -> list:
         ][:k]
 
     return results
+
+
+def retrieve_with_rbac(query: str, role: str, vectorstore, k: int = 5, mode: str | None = None) -> list:
+    """
+    Retrieve relevant chunks filtered by RBAC permissions.
+
+    `mode` is "vector" or "hybrid"; None means use FINSOLVE_RETRIEVAL_MODE.
+    In both modes the role filter is applied inside each search, BEFORE any
+    ranking or fusion, so no step ever sees a forbidden chunk.
+    """
+    allowed_depts = get_allowed_departments(role)
+    mode = mode or get_retrieval_mode()
+
+    if mode == "vector":
+        return _vector_search(query, allowed_depts, vectorstore, k)
+    if mode != "hybrid":
+        raise ValueError(f"unknown retrieval mode {mode!r}, expected one of {RETRIEVAL_MODES}")
+
+    candidates = max(k, HYBRID_CANDIDATES)
+    vector_docs = _vector_search(query, allowed_depts, vectorstore, candidates)
+    keyword_docs = bm25_search(query, allowed_depts, vectorstore, candidates)
+    return reciprocal_rank_fusion([vector_docs, keyword_docs])[:k]
 
 
 def format_context(docs: list) -> tuple[str, list]:
