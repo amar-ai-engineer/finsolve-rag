@@ -12,7 +12,7 @@ import pytest
 from langchain_core.documents import Document
 
 from src.auth import ROLES, can_access_document, get_allowed_departments
-from src.rag_chain import retrieve_with_rbac
+from src.rag_chain import RETRIEVAL_MODES, retrieve_with_rbac
 
 ALL_DEPARTMENTS = {"finance", "hr", "marketing", "engineering", "executive", "general"}
 
@@ -58,6 +58,9 @@ INJECTION_QUERIES = [
 
 ALL_QUERIES = NORMAL_QUERIES + CROSS_DEPARTMENT_QUERIES + INJECTION_QUERIES
 
+# Every leak test below runs once per retrieval mode (vector and hybrid).
+with_every_mode = pytest.mark.parametrize("mode", RETRIEVAL_MODES)
+
 
 def departments_of(docs):
     return {d.metadata["department"] for d in docs}
@@ -90,40 +93,45 @@ def test_every_chunk_has_a_known_department(chunks):
 # ---------- Retrieval never leaks ----------
 
 
+@with_every_mode
 @pytest.mark.parametrize("role", sorted(EXPECTED_ACCESS))
 @pytest.mark.parametrize("query", ALL_QUERIES)
 @pytest.mark.parametrize("k", [5, 20])
-def test_retrieval_never_returns_forbidden_department(vectorstore, role, query, k):
-    docs = retrieve_with_rbac(query, role, vectorstore, k=k)
+def test_retrieval_never_returns_forbidden_department(vectorstore, role, query, k, mode):
+    docs = retrieve_with_rbac(query, role, vectorstore, k=k, mode=mode)
     leaked = departments_of(docs) - EXPECTED_ACCESS[role]
-    assert not leaked, f"role={role!r} query={query!r} leaked {leaked}"
+    assert not leaked, f"mode={mode} role={role!r} query={query!r} leaked {leaked}"
     assert len(docs) <= k
 
 
+@with_every_mode
 @pytest.mark.parametrize("role", sorted(EXPECTED_ACCESS))
-def test_every_role_still_gets_results(vectorstore, role):
+def test_every_role_still_gets_results(vectorstore, role, mode):
     # Guards against a "secure" filter that returns nothing at all.
-    docs = retrieve_with_rbac("company policy", role, vectorstore, k=5)
+    docs = retrieve_with_rbac("company policy", role, vectorstore, k=5, mode=mode)
     assert len(docs) == 5
 
 
-def test_executive_can_reach_every_department(vectorstore):
+@with_every_mode
+def test_executive_can_reach_every_department(vectorstore, mode):
     seen = set()
     for query in ALL_QUERIES:
-        seen |= departments_of(retrieve_with_rbac(query, "executive", vectorstore, k=20))
+        seen |= departments_of(retrieve_with_rbac(query, "executive", vectorstore, k=20, mode=mode))
     assert seen == ALL_DEPARTMENTS
 
 
-def test_employee_only_ever_sees_general(vectorstore):
+@with_every_mode
+def test_employee_only_ever_sees_general(vectorstore, mode):
     for query in ALL_QUERIES:
-        docs = retrieve_with_rbac(query, "employee", vectorstore, k=20)
+        docs = retrieve_with_rbac(query, "employee", vectorstore, k=20, mode=mode)
         assert departments_of(docs) <= {"general"}
 
 
+@with_every_mode
 @pytest.mark.parametrize("role", ["admin", "", "Executive", "superuser"])
 @pytest.mark.parametrize("query", CROSS_DEPARTMENT_QUERIES + INJECTION_QUERIES)
-def test_unknown_role_only_sees_general(vectorstore, role, query):
-    docs = retrieve_with_rbac(query, role, vectorstore, k=10)
+def test_unknown_role_only_sees_general(vectorstore, role, query, mode):
+    docs = retrieve_with_rbac(query, role, vectorstore, k=10, mode=mode)
     assert departments_of(docs) <= {"general"}
 
 
@@ -143,6 +151,8 @@ def test_filter_is_what_blocks_the_board_minutes(vectorstore):
 
 
 # ---------- Fallback path (filter not supported by the store) ----------
+# These tests pin mode="vector" because they test the vector search fallback.
+# The hybrid fallback is tested in tests/test_hybrid.py.
 
 
 class NoFilterStore:
@@ -168,7 +178,7 @@ class NoFilterStore:
 
 def test_fallback_filters_in_python_and_keeps_rank_order():
     store = NoFilterStore(["executive", "general", "finance", "general", "hr", "general", "executive", "general"])
-    docs = retrieve_with_rbac("anything", "employee", store, k=2)
+    docs = retrieve_with_rbac("anything", "employee", store, k=2, mode="vector")
 
     # First call tried the filter, second call fetched 3*k unfiltered.
     assert store.calls == [
@@ -182,7 +192,7 @@ def test_fallback_filters_in_python_and_keeps_rank_order():
 @pytest.mark.parametrize("role", sorted(EXPECTED_ACCESS) + ["unknown"])
 def test_fallback_never_leaks(role):
     store = NoFilterStore(sorted(ALL_DEPARTMENTS) * 5)
-    docs = retrieve_with_rbac("anything", role, store, k=5)
+    docs = retrieve_with_rbac("anything", role, store, k=5, mode="vector")
     allowed = EXPECTED_ACCESS.get(role, {"general"})
     assert departments_of(docs) <= allowed
     assert len(docs) <= 5
@@ -195,7 +205,7 @@ def test_fallback_can_return_fewer_than_k():
     That is the safe failure mode, and this test documents it.
     """
     store = NoFilterStore(["executive"] * 15 + ["general"] * 5)
-    assert retrieve_with_rbac("anything", "employee", store, k=5) == []
+    assert retrieve_with_rbac("anything", "employee", store, k=5, mode="vector") == []
 
 
 def test_fallback_on_real_chroma_store(vectorstore):
@@ -208,5 +218,5 @@ def test_fallback_on_real_chroma_store(vectorstore):
             return vectorstore.similarity_search(query, k=k)
 
     for query in CROSS_DEPARTMENT_QUERIES + INJECTION_QUERIES:
-        docs = retrieve_with_rbac(query, "marketing", RejectFilters(), k=5)
+        docs = retrieve_with_rbac(query, "marketing", RejectFilters(), k=5, mode="vector")
         assert departments_of(docs) <= {"marketing", "general"}

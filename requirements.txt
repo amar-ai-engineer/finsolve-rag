@@ -7,6 +7,8 @@ langchain-huggingface==1.2.3
 langchain-google-genai==4.4.3
 chromadb==1.5.9
 sentence-transformers==6.2.0
+# BM25 keyword search for the optional hybrid retrieval mode
+rank-bm25==0.2.2
 python-dotenv==1.2.4
 # API service + auth
 fastapi==0.162.2
