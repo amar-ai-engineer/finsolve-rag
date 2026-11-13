@@ -4,7 +4,7 @@ FinSolve HTTP API.
 Same RAG pipeline and RBAC rules as the Streamlit app, exposed over HTTP:
 
     POST /auth/login   username + password -> signed JWT (1 hour)
-    POST /ask          question + Bearer token -> answer, sources, chunks_retrieved
+    POST /ask          question + Bearer token -> answer, sources, citations, chunks_retrieved
     GET  /health       liveness check
 
 The caller's role is read ONLY from the verified token. Anything a client
@@ -35,6 +35,7 @@ from src.auth import (
     get_jwt_secret,
 )
 from src.document_loader import load_or_build_vectorstore
+from src.observability import configure_logging
 from src.rag_chain import ask_question, get_llm
 
 load_dotenv()
@@ -48,10 +49,12 @@ VECTORSTORE_DIR = os.path.join(ROOT_DIR, "data", "vectorstore")
 async def lifespan(app: FastAPI):
     # Fail at startup, not on the first login, if the signing secret is missing.
     get_jwt_secret()
+    # One JSON log line per /ask request (role, latency, sources, tokens).
+    configure_logging()
     yield
 
 
-app = FastAPI(title="FinSolve API", version="0.4.0", lifespan=lifespan)
+app = FastAPI(title="FinSolve API", version="1.0.0", lifespan=lifespan)
 
 # auto_error=False so a missing header gives 401 (not FastAPI's default 403),
 # with the same error shape as a bad or expired token.
@@ -78,9 +81,17 @@ class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
 
 
+class Citation(BaseModel):
+    source: str
+    department: str
+    snippet: str  # first ~200 characters of the retrieved chunk
+
+
 class AskResponse(BaseModel):
     answer: str
     sources: list[str]
+    # One entry per retrieved chunk, in rank order.
+    citations: list[Citation]
     chunks_retrieved: int
 
 
