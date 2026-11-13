@@ -5,6 +5,7 @@ A RAG chatbot where each department sees ONLY their authorized data.
 
 import os
 import sys
+from html import escape
 
 import streamlit as st
 
@@ -12,7 +13,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from src.auth import DEMO_USERS, ROLES, authenticate
 from src.document_loader import load_or_build_vectorstore
+from src.observability import configure_logging
 from src.rag_chain import ask_question
+
+# One JSON log line per question on stderr (same format as the API).
+configure_logging()
 
 # ---------- Page Config ----------
 st.set_page_config(
@@ -310,6 +315,25 @@ if vectorstore is None:
     st.error("No documents found. Please add .txt files to data/documents/")
     st.stop()
 
+# ---------- Citations ----------
+def show_sources(sources: list | None, citations: list | None) -> None:
+    """Source badges, plus an expander with the retrieved passages.
+
+    Showing the actual chunk text lets the user check the answer against
+    the documents instead of trusting the model.
+    """
+    if not sources:
+        return
+    sources_html = " ".join(f'<span class="source-badge">{escape(s)}</span>' for s in sources)
+    st.markdown(f"**Sources:** {sources_html}", unsafe_allow_html=True)
+    if citations:
+        with st.expander(f"Show the {len(citations)} retrieved passages"):
+            for i, c in enumerate(citations, 1):
+                st.markdown(f"**[{i}] {c['source']}** · {c['department']}")
+                # caption: small grey text; HTML in documents is not rendered (no unsafe_allow_html).
+                st.caption(c["snippet"])
+
+
 # ---------- Chat History Display ----------
 for msg in st.session_state.chat_history:
     if msg["role"] == "human":
@@ -318,12 +342,7 @@ for msg in st.session_state.chat_history:
     else:
         with st.chat_message("assistant"):
             st.write(msg["content"])
-            if msg.get("sources"):
-                sources_html = " ".join(
-                    f'<span class="source-badge">{s}</span>'
-                    for s in msg["sources"]
-                )
-                st.markdown(f"**Sources:** {sources_html}", unsafe_allow_html=True)
+            show_sources(msg.get("sources"), msg.get("citations"))
 
 # ---------- Chat Input ----------
 if prompt := st.chat_input("Ask about company documents..."):
@@ -348,17 +367,11 @@ if prompt := st.chat_input("Ask about company documents..."):
             )
 
         st.write(result["answer"])
-
-        if result["sources"]:
-            sources_html = " ".join(
-                f'<span class="source-badge">{s}</span>'
-                for s in result["sources"]
-            )
-            st.markdown(f"**Sources:** {sources_html}", unsafe_allow_html=True)
-            st.caption(f"Retrieved {result['chunks_retrieved']} relevant chunks")
+        show_sources(result["sources"], result["citations"])
 
     st.session_state.chat_history.append({
         "role": "assistant",
         "content": result["answer"],
         "sources": result["sources"],
+        "citations": result["citations"],
     })

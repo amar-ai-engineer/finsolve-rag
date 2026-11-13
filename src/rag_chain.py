@@ -3,6 +3,7 @@ RAG chain - retrieval + generation with RBAC filtering.
 """
 
 import os
+import time
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -10,6 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from src.auth import get_allowed_departments
 from src.hybrid import bm25_search, reciprocal_rank_fusion
+from src.observability import log_request
 
 # System prompt that prevents prompt injection and data leakage
 SYSTEM_PROMPT = """You are FinSolve AI, a secure assistant for NexaFin Technologies.
@@ -132,6 +134,41 @@ def format_context(docs: list) -> tuple[str, list]:
     return context, sources
 
 
+SNIPPET_CHARS = 200
+
+
+def make_snippet(text: str, max_chars: int = SNIPPET_CHARS) -> str:
+    """First `max_chars` characters of a chunk, whitespace collapsed, cut at a word."""
+    text = " ".join(text.split())
+    if len(text) <= max_chars:
+        return text
+    cut = text[:max_chars].rsplit(" ", 1)[0]
+    return cut + "…"
+
+
+def make_citations(docs: list) -> list[dict]:
+    """One citation per retrieved chunk, in rank order, so the UI can show
+    exactly which passage the answer was grounded in (not just the file)."""
+    return [
+        {
+            "source": doc.metadata.get("source", "Unknown"),
+            "department": doc.metadata.get("department", "Unknown"),
+            "snippet": make_snippet(doc.page_content),
+        }
+        for doc in docs
+    ]
+
+
+def model_name(llm) -> str:
+    """Best-effort model identifier for logs (e.g. "gemini-2.5-flash")."""
+    name = getattr(llm, "model", None) or getattr(llm, "model_name", None) or type(llm).__name__
+    return str(name).removeprefix("models/")
+
+
+def _elapsed_ms(start: float) -> int:
+    return round((time.perf_counter() - start) * 1000)
+
+
 def ask_question(
     query: str,
     role: str,
@@ -147,27 +184,51 @@ def ask_question(
     (tests use a fake one that never calls the network). By default the
     Gemini model from get_llm() is used.
 
-    Returns dict with answer, sources, and metadata.
+    Returns dict with answer, sources, citations and chunks_retrieved.
+    Every call writes one structured log line (see src/observability.py).
     """
+    started = time.perf_counter()
+    # Filled in as the request progresses and logged once at the end,
+    # whichever way the function returns.
+    log = {"role": role}
+
+    def finish(result: dict, outcome: str) -> dict:
+        log.update(
+            outcome=outcome,
+            latency_ms=_elapsed_ms(started),
+            chunks_retrieved=result["chunks_retrieved"],
+            sources=result["sources"],
+        )
+        log_request(log, question=query)
+        return result
+
     if llm is None:
         llm = get_llm()
 
     if llm is None:
-        return {
+        return finish({
             "answer": "Please add your Google Gemini API key in the sidebar to use the AI assistant.",
             "sources": [],
+            "citations": [],
             "chunks_retrieved": 0,
-        }
+        }, outcome="no_llm")
+
+    log["model"] = model_name(llm)
 
     # Step 1: Retrieve relevant chunks (RBAC filtered)
-    docs = retrieve_with_rbac(query, role, vectorstore, k=5)
+    mode = get_retrieval_mode()
+    log["retrieval_mode"] = mode
+    t = time.perf_counter()
+    docs = retrieve_with_rbac(query, role, vectorstore, k=5, mode=mode)
+    log["retrieval_ms"] = _elapsed_ms(t)
 
     if not docs:
-        return {
+        return finish({
             "answer": f"I don't have any documents accessible to your role ({role}) that are relevant to this question. Try asking about topics your department handles.",
             "sources": [],
+            "citations": [],
             "chunks_retrieved": 0,
-        }
+        }, outcome="no_documents")
 
     # Step 2: Format context
     context, sources = format_context(docs)
@@ -184,21 +245,34 @@ def ask_question(
 
     prompt = ChatPromptTemplate.from_messages(messages)
 
-    # Step 4: Generate answer
-    chain = prompt | llm | StrOutputParser()
-
+    # Step 4: Generate answer.
+    # Invoke prompt | llm (not | StrOutputParser) so we keep the AIMessage and
+    # its usage_metadata (token counts), then turn it into text ourselves.
+    chain = prompt | llm
+    outcome = "answered"
+    t = time.perf_counter()
     try:
-        answer = chain.invoke({
+        message = chain.invoke({
             "context": context,
             "role": role,
             "user_name": user_name,
             "question": query,
         })
+        answer = StrOutputParser().invoke(message)
+        usage = getattr(message, "usage_metadata", None) or {}
+        for key in ("input_tokens", "output_tokens", "total_tokens"):
+            if key in usage:
+                log[key] = usage[key]
     except Exception as e:
         answer = f"Sorry, I encountered an error: {str(e)}"
+        outcome = "llm_error"
+        # The exception type only: the message can echo prompt content.
+        log["error_type"] = type(e).__name__
+    log["llm_ms"] = _elapsed_ms(t)
 
-    return {
+    return finish({
         "answer": answer,
         "sources": sources,
+        "citations": make_citations(docs),
         "chunks_retrieved": len(docs),
-    }
+    }, outcome=outcome)

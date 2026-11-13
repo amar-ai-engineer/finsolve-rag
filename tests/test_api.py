@@ -149,6 +149,9 @@ def test_ask_returns_answer_sources_and_chunk_count(client):
     assert body["sources"]
     allowed = get_allowed_departments("finance")
     assert all(department_of(s) in allowed for s in body["sources"])
+    # One citation (source, department, snippet) per retrieved chunk.
+    assert len(body["citations"]) == body["chunks_retrieved"]
+    assert all(c["department"] in allowed and c["snippet"] for c in body["citations"])
 
 
 def test_role_comes_from_token_not_request_body(client):
