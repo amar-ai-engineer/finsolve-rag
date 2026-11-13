@@ -17,6 +17,8 @@ services:
       # The API refuses to start without a signing secret, so fail here with a clear message.
       FINSOLVE_JWT_SECRET: ${FINSOLVE_JWT_SECRET:?Set FINSOLVE_JWT_SECRET in .env (see .env.example)}
       FINSOLVE_RETRIEVAL_MODE: ${FINSOLVE_RETRIEVAL_MODE:-hybrid}
+      FINSOLVE_LOG_LEVEL: ${FINSOLVE_LOG_LEVEL:-INFO}
+      FINSOLVE_LOG_QUESTIONS: ${FINSOLVE_LOG_QUESTIONS:-0}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
       interval: 15s
@@ -35,6 +37,8 @@ services:
     environment:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       FINSOLVE_RETRIEVAL_MODE: ${FINSOLVE_RETRIEVAL_MODE:-hybrid}
+      FINSOLVE_LOG_LEVEL: ${FINSOLVE_LOG_LEVEL:-INFO}
+      FINSOLVE_LOG_QUESTIONS: ${FINSOLVE_LOG_QUESTIONS:-0}
     healthcheck:
       # Streamlit's built-in health endpoint.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=4)"]
